@@ -65,58 +65,61 @@ let rec cps_transform (t : S.term) : (S.term -> S.term) -> S.term =
 
 (* Actual translation; to be called after the CPS function, so that every rhs in an
  * application is a value. *)
-let rec tc_term (t : S.term) : T.term =
+let rec tail_term (t : S.term) (k : T.term -> T.term) : T.term =
   match t with
-  | S.Print t ->
-      let vt = tc_val t in
-      let t' = tc_term t in
-      T.Print (vt, t')
-  | S.Var _ | S.Lit _ | S.BinOp _ ->
-      T.Exit
-  | _ ->
-      tc_call t []
-
-and tc_val (t : S.term) : T.value =
-  match t with
-  | S.Var x ->
-      T.VVar x
-  | S.Lit i ->
-      T.VLit i
-  | S.BinOp (t, op, u) ->
-      let vt = tc_val t in
-      let ut = tc_val u in
-      T.VBinOp (vt, op, ut)
-  | S.Print t ->
-      tc_val t
-  | _ ->
-      assert false
-
-(* tc_call evaluates expressions of the form f a1 .. an recursively. Arguments ai are treated as values
- * and eventually declared in let-expressions. The head f is read last (terminal case). *)
-and tc_call (t : S.term) (vs : T.value list) : T.term =
-  match t with
-  | S.Var x ->
-      T.TailCall (T.VVar x, vs)
+  | S.Var _ | S.Lam _ | S.Lit _ | S.BinOp _ ->
+      k T.Exit
   | S.App (t, u) ->
-      let decl, x = tc_arg u in
-      let t' = tc_call t (T.VVar x :: vs) in
-      decl t'
+      assert false
+  | S.Print t ->
+      k (tail_value t (fun v ->
+        T.Print (v, T.Exit)))
+  | S.Let (x, t, u) ->
+      tail_arg t (fun a ->
+        tail_term (ren u x a) k)
+
+and tail_value (t : S.term) (k : T.value -> T.term) : T.term =
+  match t with
+  | S.Var x ->
+      k (T.VVar x)
+  | S.Lam _ | S.App _ | S.Let _ ->
+      assert false
+  | S.Lit i ->
+      k (T.VLit i)
+  | S.BinOp (t, op, u) ->
+      tail_value t (fun v ->
+        tail_value u (fun v' ->
+          k (T.VBinOp (v, op, v'))))
+  | S.Print t ->
+      tail_value t (fun v ->
+        T.Print (v, k v))
+
+and tail_block (t : S.term) (k : T.block -> T.term) : T.term =
+  assert false
+
+and tail_call (t : S.term) (pi : T.value list) (k : T.term -> T.term) : T.term =
+  match t with
+  | S.Var x ->
+      k (T.TailCall (T.VVar x, pi))
+  | S.Lam (self, x, t) ->
+      assert false
+  | S.App (t, u) ->
+      tail_arg u (fun a ->
+        tail_call t ((T.VVar a) :: pi) k)
   | _ ->
       assert false
 
-and tc_arg (t : S.term) : (T.term -> T.term ) * Atom.atom =
+and tail_arg (t : S.term) (k : T.variable -> T.term) : T.term =
   match t with
-  | S.Lam _ ->
-      assert false
-  | S.App _ ->
+  | S.Lam (self, x, t) ->
       assert false
   | _ ->
-      let x = Atom.fresh "x" in
-      let v = tc_val t in
-      (fun t' -> T.LetVal (x, v, t')), x
+      let a = Atom.fresh "a" in
+      tail_value t (fun v ->
+        T.LetVal (a, v, k a))
 
 
 let cps_term (t : S.term) : T.term =
   let cps_t = cps_transform t (fun k -> k) in
-  let tc_t = tc_term cps_t in
-  tc_t
+  let tcl_t = tail_term cps_t (fun k -> k) in
+  tcl_t

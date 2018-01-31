@@ -1,0 +1,1 @@
+print ((print 12) + (print 30))

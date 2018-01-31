@@ -1,0 +1,2 @@
+let a = print 5 in
+print (2 * a)
