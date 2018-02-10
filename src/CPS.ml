@@ -67,10 +67,11 @@ let rec cps_transform (t : S.term) : (S.term -> S.term) -> S.term =
  * application is a value. *)
 let rec tail_term (t : S.term) (k : T.term -> T.term) : T.term =
   match t with
-  | S.Var _ | S.Lam _ | S.Lit _ | S.BinOp _ ->
+  | S.Lam _ | S.Lit _ | S.BinOp _ ->
+      (* Output value of a term; discarded *)
       k T.Exit
-  | S.App (t, u) ->
-      assert false
+  | S.Var _ | S.App _ ->
+      tail_call t [] k
   | S.Print t ->
       k (tail_value t (fun v ->
         T.Print (v, T.Exit)))
@@ -80,10 +81,10 @@ let rec tail_term (t : S.term) (k : T.term -> T.term) : T.term =
 
 and tail_value (t : S.term) (k : T.value -> T.term) : T.term =
   match t with
-  | S.Var x ->
-      k (T.VVar x)
   | S.Lam _ | S.App _ | S.Let _ ->
       assert false
+  | S.Var x ->
+      k (T.VVar x)
   | S.Lit i ->
       k (T.VLit i)
   | S.BinOp (t, op, u) ->
@@ -94,15 +95,18 @@ and tail_value (t : S.term) (k : T.value -> T.term) : T.term =
       tail_value t (fun v ->
         T.Print (v, k v))
 
-and tail_block (t : S.term) (k : T.block -> T.term) : T.term =
-  assert false
+and tail_block (t : S.term) (s : S.self) (args : T.variable list) (k : T.block -> T.term) : T.term =
+  match t with
+  | S.Lam (S.NoSelf, x, t) ->
+      tail_block t s (x :: args) k
+  | _ ->
+      let t' = tail_term t (fun k -> k) in
+      k (T.Lam (s, args, t'))
 
 and tail_call (t : S.term) (pi : T.value list) (k : T.term -> T.term) : T.term =
   match t with
   | S.Var x ->
       k (T.TailCall (T.VVar x, pi))
-  | S.Lam (self, x, t) ->
-      assert false
   | S.App (t, u) ->
       tail_arg u (fun a ->
         tail_call t ((T.VVar a) :: pi) k)
@@ -112,7 +116,9 @@ and tail_call (t : S.term) (pi : T.value list) (k : T.term -> T.term) : T.term =
 and tail_arg (t : S.term) (k : T.variable -> T.term) : T.term =
   match t with
   | S.Lam (self, x, t) ->
-      assert false
+      let f = Atom.fresh "f" in
+      tail_block t self [x] (fun b ->
+        T.LetBlo (f, b, k f))
   | _ ->
       let a = Atom.fresh "a" in
       tail_value t (fun v ->
@@ -120,6 +126,6 @@ and tail_arg (t : S.term) (k : T.variable -> T.term) : T.term =
 
 
 let cps_term (t : S.term) : T.term =
-  let cps_t = cps_transform t (fun k -> k) in
-  let tcl_t = tail_term cps_t (fun k -> k) in
-  tcl_t
+  let t' = cps_transform t (fun k -> k) in
+  let t'' = tail_term t' (fun k -> k) in
+  t''
