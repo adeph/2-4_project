@@ -33,34 +33,40 @@ let rec ren (t : S.term) (x : Atom.atom) (y : Atom.atom) : S.term =
       t
 
 (* This is the one-pass CPS translation described by Danvy and Filinski in their 1991 paper. *)
-let rec cps_transform (t : S.term) : (S.term -> S.term) -> S.term =
+let rec cps_transform (t : S.term) (k : S.term -> S.term) : S.term =
   match t with
   | S.Var x ->
-      fun k -> k (S.Var x)
+      k (S.Var x)
   | S.Lam (self, x, t) ->
-      let k2 = Atom.fresh "k" in
+      let k' = Atom.fresh "k" in
       let t_tr = cps_transform t in
-      fun k1 -> k1 (S.Lam (self, x, S.Lam (S.NoSelf, k2, t_tr (fun m -> S.App (S.Var k2, m)))))
+      k (S.Lam (self, x, S.Lam (S.NoSelf, k', t_tr (fun m ->
+        S.App (S.Var k', m)))))
   | S.App (t, u) ->
-      let k2 = Atom.fresh "a" in
+      let k' = Atom.fresh "a" in
       let t_tr = cps_transform t in
       let u_tr = cps_transform u in
-      fun k1 -> t_tr (fun m -> u_tr (fun n -> S.App ((S.App (m, n)), (S.Lam (S.NoSelf, k2, k1 (S.Var k2))))))
+      t_tr (fun m ->
+        u_tr (fun n ->
+          S.App ((S.App (m, n)), (S.Lam (S.NoSelf, k', k (S.Var k'))))))
   | S.Lit i ->
-      fun k -> k (S.Lit i)
+      k (S.Lit i)
   | S.BinOp (t, op, u) ->
       let t_tr = cps_transform t in
       let u_tr = cps_transform u in
-      fun k -> t_tr (fun m -> u_tr (fun n -> k (S.BinOp (m, op, n))))
+      t_tr (fun m ->
+        u_tr (fun n -> k (S.BinOp (m, op, n))))
   | S.Print t ->
       let t_tr = cps_transform t in
-      fun k -> t_tr (fun m -> k (S.Print m))
+      t_tr (fun m ->
+        k (S.Print m))
   | S.Let (x, t, u) ->
       (* x is renamed in u because it could be captured in the term k. *)
       let y = Atom.fresh "x" in
       let t_tr = cps_transform t in
       let u_tr = cps_transform (ren u x y) in
-      fun k -> t_tr (fun n -> S.Let (y, n, u_tr k))
+      t_tr (fun n ->
+        S.Let (y, n, u_tr k))
 
 
 (* Actual translation; to be called after the CPS function, so that every rhs in an
@@ -106,10 +112,13 @@ and tail_block (t : S.term) (s : S.self) (args : T.variable list) (k : T.block -
 and tail_call (t : S.term) (pi : T.value list) (k : T.term -> T.term) : T.term =
   match t with
   | S.Var x ->
-      k (T.TailCall (T.VVar x, pi))
+      k (T.TailCall (T.VVar x, List.rev pi))
   | S.App (t, u) ->
       tail_arg u (fun a ->
         tail_call t ((T.VVar a) :: pi) k)
+  | S.Lam _ ->
+      tail_arg t (fun f ->
+        k (T.TailCall (T.VVar f, List.rev pi)))
   | _ ->
       assert false
 
