@@ -228,6 +228,12 @@ let rec finish_term (t : S.term) : C.stmt =
         init_block x b1 @
         [ finish_term t2 ]
       )
+  | S.Cond (v, t1, t2) ->
+      T.IfElse (
+        to_int (finish_value v),
+        finish_term t1,
+        finish_term t2
+      )
   | S.Swi (v, bs) ->
       T.Switch (
         read_tag v,

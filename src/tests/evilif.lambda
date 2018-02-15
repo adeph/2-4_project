@@ -1,0 +1,6 @@
+let r =
+	ifzero ((fun x -> fun y -> 2 * x - y) 5 10)
+	then ((fun x -> 6 * x) 111)
+	else 0
+in
+print r

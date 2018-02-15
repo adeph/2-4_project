@@ -1,0 +1,1 @@
+print (ifzero (print 99) then 0 else print 14)

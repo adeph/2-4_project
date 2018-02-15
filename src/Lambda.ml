@@ -14,7 +14,10 @@
       unbound variable is rejected during the translation of [RawLambda] to
       [Lambda].
 
-   3. Terms are no longer annotated with places. *)
+   3. Terms are no longer annotated with places.
+
+   4. Branches in conditional are swapped to match the C semantics of
+      if-then-else expressions. *)
 
 (* Variables are atoms. *)
 
@@ -44,5 +47,6 @@ and term =
   | BinOp of term * binop * term
   | Print of term
   | Let of variable * term * term
+  | Cond of term * term * term
 
 [@@deriving show { with_path = false }]

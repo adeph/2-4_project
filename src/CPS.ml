@@ -3,7 +3,7 @@ module S = Lambda
 (* The target calculus. *)
 module T = Tail
 
-(* Rename x as y in t. Needed in the CPS translation of let-expressions. *)
+(* Rename x as y in t. Needed in the CPS translation to avoid capture of variables. *)
 let rec ren (t : S.term) (x : Atom.atom) (y : Atom.atom) : S.term =
   match t with
   | S.Var z when z == x ->
@@ -29,6 +29,11 @@ let rec ren (t : S.term) (x : Atom.atom) (y : Atom.atom) : S.term =
       let t_r = ren t x y in
       let u_r = ren u x y in
       S.Let (z, t_r, u_r)
+  | S.Cond (v, t, u) ->
+      let v_r = ren v x y in
+      let t_r = ren t x y in
+      let u_r = ren u x y in
+      S.Cond (v_r, t_r, u_r)
   | _ ->
       t
 
@@ -61,12 +66,24 @@ let rec cps_transform (t : S.term) (k : S.term -> S.term) : S.term =
       t_tr (fun m ->
         k (S.Print m))
   | S.Let (x, t, u) ->
-      (* x is renamed in u because it could be captured in the term k. *)
+      (* x is renamed in u because it could be captured in the context k. *)
       let y = Atom.fresh "x" in
       let t_tr = cps_transform t in
       let u_tr = cps_transform (ren u x y) in
       t_tr (fun n ->
         S.Let (y, n, u_tr k))
+  | S.Cond (v, t, u) ->
+      (* Introducing a let-in to avoid duplicating k. *)
+      let k' = Atom.fresh "k" in
+      let a = Atom.fresh "a" in
+      let v_tr = cps_transform v in
+      let t_tr = cps_transform t in
+      let u_tr = cps_transform u in
+      S.Let (k', S.Lam (S.NoSelf, a, k (S.Var a)),
+      v_tr (fun p ->
+        S.Cond (p,
+        t_tr (fun m -> S.App (S.Var k', m)),
+        u_tr (fun n -> S.App (S.Var k', n)))))
 
 
 (* Actual translation; to be called after the CPS function, so that every rhs in an
@@ -84,10 +101,15 @@ let rec tail_term (t : S.term) (k : T.term -> T.term) : T.term =
   | S.Let (x, t, u) ->
       tail_arg t (fun a ->
         tail_term (ren u x a) k)
+  | S.Cond (v, t, u) ->
+      tail_value v (fun p ->
+        tail_term t (fun m ->
+          tail_term u (fun n ->
+            k (T.Cond (p, m, n)))))
 
 and tail_value (t : S.term) (k : T.value -> T.term) : T.term =
   match t with
-  | S.Lam _ | S.App _ | S.Let _ ->
+  | S.Lam _ | S.App _ | S.Let _ | S.Cond _ ->
       assert false
   | S.Var x ->
       k (T.VVar x)

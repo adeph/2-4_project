@@ -1,0 +1,4 @@
+let rec g = fun x ->
+	ifzero 0 then 54 else (g 0)
+in
+print (g 9)

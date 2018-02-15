@@ -83,6 +83,11 @@ let rec def_term (t : S.term) (s : state) : state * T.term =
       let s', b' = def_block b s in
       let s'', t' = def_term t s' in
       s'', T.LetBlo (f, b', t')
+  | S.Cond (v, t, u) ->
+      let v' = def_value v in
+      let s', t' = def_term t s in
+      let s'', u' = def_term u s' in
+      s'', T.Cond (v', t', u')
 
 and def_value (t : S.value) : T.value =
   match t with

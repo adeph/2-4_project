@@ -1,0 +1,2 @@
+let rec f = fun x -> 13 in
+print (f 71)

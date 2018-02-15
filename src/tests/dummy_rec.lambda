@@ -1,0 +1,12 @@
+let rec f = fun x -> 0 in
+let rec g = fun x ->
+	(fun y -> x + y)
+in
+let rec h = fun x ->
+	print x
+in
+let _ = print (f 53) in
+let _ = print (g 63 37) in
+let _ = print (h 88888) in
+
+print 1

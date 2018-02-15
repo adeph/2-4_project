@@ -1,0 +1,4 @@
+(* A CPS translation without renaming would capture
+ * the variable x in a continuation context. *)
+let f = fun x -> x + (let x = 3 in x) in
+print (f 5)

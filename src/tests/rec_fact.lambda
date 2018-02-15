@@ -1,0 +1,13 @@
+let rec fact = fun n ->
+	ifzero n
+		then 1
+		else (n * (fact (n - 1)))
+in
+let _ = print (fact 0) in
+let _ = print (fact 1) in
+let _ = print (fact 2) in
+let _ = print (fact 3) in
+let _ = print (fact 4) in
+let _ = print (fact 10) in
+
+print 37

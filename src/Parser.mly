@@ -1,6 +1,7 @@
 %token<string> IDENT
 %token<int> INTLITERAL
 %token FUN IN LET PRINT REC
+%token IF THEN ELSE
 %token ARROW EQ LPAREN RPAREN
 %token<RawLambda.binop> MULOP ADDOP
 %token EOF
@@ -67,6 +68,8 @@ any_term_:
     { Lam (x, t) }
 | LET mode = recursive x = IDENT EQ t1 = any_term IN t2 = any_term
     { Let (mode, x, t1, t2) }
+| IF v = any_term THEN t1 = any_term ELSE t2 = any_term
+    { Cond (v, t1, t2) }
 
 %inline any_term:
   t = placed(any_term_)

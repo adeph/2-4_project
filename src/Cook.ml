@@ -49,6 +49,8 @@ let rec cook_term env { S.place; S.value } =
       T.Let (f, T.Lam (T.Self f, x, t1), t2)
   | S.Let (S.Recursive, _, { S.place; _ }, _) ->
       error place "the right-hand side of 'let rec' must be a lambda-abstraction"
+  | S.Cond (p, t1, t2) ->
+      T.Cond (cook_term env p, cook_term env t2, cook_term env t1)
 
 let cook_term t =
   cook_term Env.empty t

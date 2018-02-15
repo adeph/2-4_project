@@ -65,7 +65,10 @@ and block =
      executes the term [t].
 
    - The term [LetBlo (x, b, t)] allocates the memory block [b] and binds the
-     variable [x] to its address, then executes the term [t]. *)
+     variable [x] to its address, then executes the term [t].
+
+   - The term [Cond (v, t, u)] executes [t] if [v] evaluates to a non-zero
+     value and [u] otherwise. *)
 
 and term =
   | Exit
@@ -73,6 +76,7 @@ and term =
   | Print of value * term
   | LetVal of variable * value * term
   | LetBlo of variable * block * term
+  | Cond of value * term * term
 
 [@@deriving show { with_path = false }]
 
@@ -130,3 +134,6 @@ and fv_term (t : term) =
       union
         (fv_block b1)
         (remove x (fv_term t2))
+  | Cond (v, t1, t2) ->
+      union (fv_value v)
+        (union (fv_term t1) (fv_term t2))

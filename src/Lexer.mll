@@ -44,6 +44,12 @@ rule entry = parse
     { PRINT }
 | "rec"
     { REC }
+| "ifzero"
+    { IF }
+| "then"
+    { THEN }
+| "else"
+    { ELSE }
 | "->"
     { ARROW }
 | "="
